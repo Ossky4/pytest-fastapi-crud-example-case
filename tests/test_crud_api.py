@@ -1,5 +1,9 @@
 import time
 
+from fastapi import HTTPException, status
+
+import app.user as user_routes
+
 
 def test_root(test_client):
     response = test_client.get("/api/healthchecker")
@@ -104,3 +108,35 @@ def test_update_user_doesnt_exist(test_client, user_id, user_payload_updated):
     assert response.status_code == 404
     response_json = response.json()
     assert response_json["detail"] == f"No User with this id: `{user_id}` found"
+
+
+def test_get_user_reuses_shared_lookup_404(test_client, monkeypatch, user_id):
+    detail = "lookup helper 404"
+
+    def fake_get_user_or_404(db, requested_user_id):
+        assert requested_user_id == user_id
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
+
+    monkeypatch.setattr(user_routes, "_get_user_or_404", fake_get_user_or_404)
+
+    response = test_client.get(f"/api/users/{user_id}")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": detail}
+
+
+def test_update_user_reuses_shared_lookup_404(
+    test_client, monkeypatch, user_id, user_payload_updated
+):
+    detail = "lookup helper 404"
+
+    def fake_get_user_or_404(db, requested_user_id):
+        assert requested_user_id == user_id
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
+
+    monkeypatch.setattr(user_routes, "_get_user_or_404", fake_get_user_or_404)
+
+    response = test_client.patch(f"/api/users/{user_id}", json=user_payload_updated)
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": detail}
