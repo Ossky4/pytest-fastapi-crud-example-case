@@ -8,6 +8,16 @@ from app.database import get_db
 router = APIRouter()
 
 
+def _get_user_or_404(db: Session, user_id: str):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No User with this id: `{user_id}` found",
+        )
+    return user
+
+
 @router.post(
     "/", status_code=status.HTTP_201_CREATED, response_model=schemas.UserResponse
 )
@@ -44,14 +54,7 @@ def create_user(payload: schemas.UserBaseSchema, db: Session = Depends(get_db)):
     "/{userId}", status_code=status.HTTP_200_OK, response_model=schemas.GetUserResponse
 )
 def get_user(userId: str, db: Session = Depends(get_db)):
-    user_query = db.query(models.User).filter(models.User.id == userId)
-    db_user = user_query.first()
-
-    if not db_user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No User with this id: `{userId}` found",
-        )
+    db_user = _get_user_or_404(db, userId)
 
     try:
         return schemas.GetUserResponse(
@@ -72,14 +75,8 @@ def get_user(userId: str, db: Session = Depends(get_db)):
 def update_user(
     userId: str, payload: schemas.UserBaseSchema, db: Session = Depends(get_db)
 ):
+    db_user = _get_user_or_404(db, userId)
     user_query = db.query(models.User).filter(models.User.id == userId)
-    db_user = user_query.first()
-
-    if not db_user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No User with this id: `{userId}` found",
-        )
 
     try:
         update_data = payload.dict(exclude_unset=True)
